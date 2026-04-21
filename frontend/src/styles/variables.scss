@@ -1,0 +1,19 @@
+// vue-pure-admin inspired theme variables
+$sidebar-width: 210px;
+$sidebar-collapsed-width: 64px;
+$navbar-height: 48px;
+$tag-bar-height: 34px;
+
+// Colors
+$sidebar-bg: #001529;
+$sidebar-text: rgba(255, 255, 255, 0.65);
+$sidebar-text-active: #fff;
+$sidebar-active-bg: var(--el-color-primary);
+$sidebar-hover-bg: rgba(255, 255, 255, 0.08);
+$sidebar-group-text: rgba(255, 255, 255, 0.35);
+$navbar-bg: #fff;
+$navbar-border: #f0f0f0;
+$main-bg: #f5f7fa;
+
+// Transitions
+$sidebar-transition: width 0.28s ease;

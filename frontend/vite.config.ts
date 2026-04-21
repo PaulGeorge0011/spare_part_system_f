@@ -108,7 +108,6 @@ export default defineConfig({
           // 电气系统页面打包在一起
           if (id.includes('/views/SparePartList') ||
               id.includes('/views/SparePartRequisition') ||
-              id.includes('/views/layouts/ElectricalLayout') ||
               id.includes('/components/SparePartFormDialog') ||
               id.includes('/components/BatchImportDialog') ||
               id.includes('/components/BatchImageImportDialog')) {
@@ -117,10 +116,13 @@ export default defineConfig({
           // 机械系统页面打包在一起
           if (id.includes('/views/MechanicalSparePartList') ||
               id.includes('/views/MechanicalSparePartRequisition') ||
-              id.includes('/views/layouts/MechanicalLayout') ||
               id.includes('/components/MechanicalSparePartFormDialog') ||
               id.includes('/components/MechanicalRequisitionDialog')) {
             return 'mechanical'
+          }
+          // 布局组件
+          if (id.includes('/layout/')) {
+            return 'layout'
           }
         }
       }

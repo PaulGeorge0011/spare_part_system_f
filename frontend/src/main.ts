@@ -95,6 +95,9 @@ if (typeof window !== 'undefined') {
 // Element Plus 样式（按需导入组件，但样式仍需导入）
 import 'element-plus/dist/index.css'
 
+// vue-pure-admin 风格布局样式
+import '@/styles/layout.scss'
+
 
 // 只注册常用图标，其他图标在组件中按需导入
 import {

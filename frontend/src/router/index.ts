@@ -4,14 +4,12 @@ import { defaultPathForUser } from '@/utils/defaultPath'
 import { navLog, navLogStart } from '@/utils/navLog'
 import type { ModulePermLevel } from '@/utils/modules'
 
-// 静态导入所有页面组件，取消懒加载以提升页面流转速度（数据量不大）
 import Login from '@/views/Login.vue'
 import Register from '@/views/Register.vue'
+import SetPassword from '@/views/SetPassword.vue'
 import SsoCallback from '@/views/sso-callback.vue'
 import WechatLoginEntry from '@/views/WechatLoginEntry.vue'
 import HomeView from '@/views/HomeView.vue'
-import ElectricalLayout from '@/views/layouts/ElectricalLayout.vue'
-import MechanicalLayout from '@/views/layouts/MechanicalLayout.vue'
 import SparePartList from '@/views/SparePartList.vue'
 import MechanicalSparePartList from '@/views/MechanicalSparePartList.vue'
 import SparePartRequisition from '@/views/SparePartRequisition.vue'
@@ -28,106 +26,96 @@ const router = createRouter({
     return { top: 0, left: 0, behavior: 'auto' as ScrollBehavior }
   },
   routes: [
+    // Public pages (no layout)
     { path: '/login',        name: 'Login',       component: Login,       meta: { public: true } },
     { path: '/register',     name: 'Register',    component: Register,    meta: { public: true } },
+    { path: '/set-password', name: 'SetPassword', component: SetPassword, meta: { public: true } },
     { path: '/sso/callback', name: 'SsoCallback', component: SsoCallback, meta: { public: true } },
     { path: '/wechat-login', name: 'WechatLoginEntry', component: WechatLoginEntry, meta: { public: true } },
-    { path: '/home',         name: 'Home',        component: HomeView },
+
+    // Home
+    { path: '/home', name: 'Home', component: HomeView },
     { path: '/', redirect: () => ({ path: '/home' }) },
 
-    // 电气备件管理
+    // Electrical module
+    { path: '/electrical', redirect: '/electrical/parts' },
     {
-      path: '/electrical',
-      component: ElectricalLayout,
+      path: '/electrical/parts',
+      name: 'SparePartList',
+      component: SparePartList,
+      meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel, noClerk: true },
+    },
+    {
+      path: '/electrical/requisition',
+      name: 'SparePartRequisition',
+      component: SparePartRequisition,
       meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel },
-      children: [
-        { path: '', redirect: (to) => ({ path: '/electrical/parts', query: to.query }) },
-        {
-          path: 'parts',
-          name: 'SparePartList',
-          component: SparePartList,
-          meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel, noClerk: true },
-        },
-        {
-          path: 'requisition',
-          name: 'SparePartRequisition',
-          component: SparePartRequisition,
-          meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel },
-        },
-        {
-          path: 'inventory',
-          name: 'Inventory',
-          component: InventoryView,
-          meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel },
-        },
-        {
-          path: 'operation-logs',
-          name: 'OperationLogs',
-          component: OperationLogView,
-          meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel, noClerk: true },
-        },
-        {
-          path: 'users',
-          name: 'UserManage',
-          component: UserManage,
-          meta: { moduleId: 'electrical', minLevel: 'admin' as ModulePermLevel },
-        },
-        {
-          path: 'reports',
-          name: 'Reports',
-          component: ReportsView,
-          meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel },
-        },
-      ],
     },
-
-    // 机械备件管理
     {
-      path: '/mechanical',
-      component: MechanicalLayout,
-      meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel },
-      children: [
-        { path: '', redirect: (to) => ({ path: '/mechanical/parts', query: to.query }) },
-        {
-          path: 'parts',
-          name: 'MechanicalSparePartList',
-          component: MechanicalSparePartList,
-          meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel, noClerk: true },
-        },
-        {
-          path: 'requisition',
-          name: 'MechanicalSparePartRequisition',
-          component: MechanicalSparePartRequisition,
-          meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel },
-        },
-        {
-          path: 'inventory',
-          name: 'MechanicalInventory',
-          component: InventoryView,
-          meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel },
-        },
-        {
-          path: 'operation-logs',
-          name: 'MechanicalOperationLogs',
-          component: OperationLogView,
-          meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel, noClerk: true },
-        },
-        {
-          path: 'users',
-          name: 'MechanicalUserManage',
-          component: UserManage,
-          meta: { moduleId: 'mechanical', minLevel: 'admin' as ModulePermLevel },
-        },
-        {
-          path: 'reports',
-          name: 'MechanicalReports',
-          component: ReportsView,
-          meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel },
-        },
-      ],
+      path: '/electrical/inventory',
+      name: 'Inventory',
+      component: InventoryView,
+      meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel },
+    },
+    {
+      path: '/electrical/operation-logs',
+      name: 'OperationLogs',
+      component: OperationLogView,
+      meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel, noClerk: true },
+    },
+    {
+      path: '/electrical/users',
+      name: 'UserManage',
+      component: UserManage,
+      meta: { moduleId: 'electrical', minLevel: 'admin' as ModulePermLevel },
+    },
+    {
+      path: '/electrical/reports',
+      name: 'Reports',
+      component: ReportsView,
+      meta: { moduleId: 'electrical', minLevel: 'viewer' as ModulePermLevel },
     },
 
-    // 兼容旧路径重定向
+    // Mechanical module
+    { path: '/mechanical', redirect: '/mechanical/parts' },
+    {
+      path: '/mechanical/parts',
+      name: 'MechanicalSparePartList',
+      component: MechanicalSparePartList,
+      meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel, noClerk: true },
+    },
+    {
+      path: '/mechanical/requisition',
+      name: 'MechanicalSparePartRequisition',
+      component: MechanicalSparePartRequisition,
+      meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel },
+    },
+    {
+      path: '/mechanical/inventory',
+      name: 'MechanicalInventory',
+      component: InventoryView,
+      meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel },
+    },
+    {
+      path: '/mechanical/operation-logs',
+      name: 'MechanicalOperationLogs',
+      component: OperationLogView,
+      meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel, noClerk: true },
+    },
+    {
+      path: '/mechanical/users',
+      name: 'MechanicalUserManage',
+      component: UserManage,
+      meta: { moduleId: 'mechanical', minLevel: 'admin' as ModulePermLevel },
+    },
+    {
+      path: '/mechanical/reports',
+      name: 'MechanicalReports',
+      component: ReportsView,
+      meta: { moduleId: 'mechanical', minLevel: 'viewer' as ModulePermLevel },
+    },
+
+    // Legacy redirects
     { path: '/spare-parts',            redirect: '/electrical/parts'        },
     { path: '/requisition',            redirect: '/electrical/requisition'  },
     { path: '/mechanical-spare-parts', redirect: '/mechanical/parts'        },
@@ -139,15 +127,9 @@ const router = createRouter({
   ],
 })
 
-// 用户信息加载状态
 let userFetchPromise: Promise<any> | null = null
 let navStartTime = 0
 
-/**
- * 路由守卫：
- * - 所有受保护页面均通过 meta.moduleId + meta.minLevel 控制权限
- * - 统一调用 auth.canAccessModule() 做判断，无需按路径前缀分叉
- */
 router.beforeEach(async (to, from, next) => {
   navStartTime = navLogStart()
   navLog('beforeEach start', { from: from.path, to: to.path })
@@ -155,7 +137,6 @@ router.beforeEach(async (to, from, next) => {
   const auth = useAuthStore()
   const token = auth.token ?? localStorage.getItem('access_token')
 
-  // 公开页面直接放行
   if (to.meta.public) {
     if (to.name === 'SsoCallback') { next(); return }
     if (token && auth.user) { next(defaultPathForUser(auth)); return }
@@ -163,13 +144,11 @@ router.beforeEach(async (to, from, next) => {
     return
   }
 
-  // 无 token 直接跳转登录
   if (!token) {
     next({ path: '/login', query: { redirect: to.fullPath } })
     return
   }
 
-  // 优先使用缓存用户信息，后台静默刷新
   if (auth.user) {
     if (!userFetchPromise) {
       userFetchPromise = auth.fetchUser().catch(() => null).finally(() => { userFetchPromise = null })
@@ -187,7 +166,6 @@ router.beforeEach(async (to, from, next) => {
 
   const path = to.path
 
-  // 进入电气/机械系统根时，重定向到备件列表（只读用户也可访问）
   if (path === '/electrical' || path === '/electrical/') {
     if (auth.canAccessModule('electrical', 'viewer')) {
       next({ path: auth.isElectricalClerk ? '/electrical/requisition' : '/electrical/parts', query: to.query, replace: true })
@@ -201,7 +179,6 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
-  // 领用员不能访问备件列表、操作记录（库存管理已对领用员开放）
   if (to.meta.noClerk) {
     if (auth.isElectricalClerk && (to.meta.moduleId as string) === 'electrical') {
       next({ path: '/electrical/requisition', replace: true })
@@ -213,7 +190,6 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
-  // 统一模块权限校验（所有带 moduleId meta 的路由）
   if (to.meta.moduleId) {
     const moduleId = to.meta.moduleId as string
     const minLevel = (to.meta.minLevel as ModulePermLevel) ?? 'viewer'
