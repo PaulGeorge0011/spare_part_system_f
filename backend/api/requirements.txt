@@ -1,0 +1,21 @@
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+sqlalchemy==2.0.23
+pymysql==1.1.0
+pydantic==2.7.0
+pydantic-settings==2.6.0
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-multipart==0.0.6
+alembic==1.13.1
+redis==5.0.1
+celery==5.3.6
+wechatpy
+python-dotenv==1.0.0
+minio==7.1.16  # 新增
+pillow==10.1.0  # 用于图片处理
+python-magic==0.4.27  # 用于文件类型检测
+apscheduler==3.10.4  # 添加这一行
+httpx==0.25.2  # 用于下载图片
+openpyxl==3.1.5  # 用户批量导入 Excel 解析

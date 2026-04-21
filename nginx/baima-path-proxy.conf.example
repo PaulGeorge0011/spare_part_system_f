@@ -1,0 +1,39 @@
+# ============================================================
+# 白码同域路径代理（推荐：解决 Mixed Content + 不暴露 IP）
+# ============================================================
+#
+# 白码技术支持建议：将备件系统挂到白码同一域名下，避免浏览器跨域/混合内容拦截。
+# 将下面 location 块复制到「已提供 HTTPS 的 白码 server」中（即 haodaapp.yxjyc.com 的 server { ... } 内）。
+#
+# 效果：
+#   - iframe 地址改为：https://haodaapp.yxjyc.com/spare/
+#   - 与白码同域、同 HTTPS，无 Mixed Content，不暴露服务器 IP
+#
+# 使用步骤：
+#   1. 在 白码 Nginx 中找到 haodaapp.yxjyc.com 的 server { } 块
+#   2. 在该 server 内加入下面整段 location /spare/ { ... }
+#   3. 备件系统前端需用「/spare/」作为 base 重新构建（见文档）
+#   4. 重启白码 Nginx: nginx -t && nginx -s reload
+#   5. 白码 iframe 地址填：https://haodaapp.yxjyc.com/spare/
+#
+# ============================================================
+
+    # 备件管理系统：/spare/ 代理到本机 8080（与白码同域，解决 Mixed Content）
+    location /spare/ {
+        proxy_pass http://127.0.0.1:8080/;
+
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400;
+
+        client_max_body_size 10M;
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }

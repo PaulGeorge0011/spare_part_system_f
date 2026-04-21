@@ -1,0 +1,6 @@
+Django==4.2.0
+mysqlclient==2.2.0
+django-cors-headers==4.2.0
+gunicorn==21.2.0
+django-import-export==3.3.0  # 可选：数据导入导出
+django-admin-interface==0.26.0  # 可选：美化 Admin 界面

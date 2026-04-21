@@ -1,0 +1,54 @@
+# Environment secrets
+.env
+
+# Python
+.venv/
+**/venv_backend/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+*.egg
+
+# Node
+frontend/node_modules/
+frontend/dist/
+frontend_bk/
+
+# Uploads (user data)
+uploads/
+
+# Offline deployment bundle
+spare_part_phase1_offline/
+
+# MySQL data
+mysql/data/
+
+# SSL generated certs
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+!ssl/generate-cert.sh
+
+# IDE
+.cursor/
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Large binary files
+*.tar
+*.tar.gz
+*.zip
+*.xlsx
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log

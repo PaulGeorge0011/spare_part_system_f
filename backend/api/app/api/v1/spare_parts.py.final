@@ -1,0 +1,216 @@
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy.orm import Session
+from sqlalchemy import or_
+from typing import List, Optional
+from datetime import datetime
+
+from ...core.database import get_db
+from ...models.spare_part import SparePart, Category
+from ...schemas.spare_part import (
+    SparePartCreate, 
+    SparePartUpdate, 
+    SparePartResponse,
+    SparePartListResponse
+)
+from ...crud import spare_part as crud_spare_part
+from ...services.spare_part_service import SparePartService
+
+router = APIRouter()
+
+@router.get("/spare-parts", response_model=SparePartListResponse)
+def get_spare_parts(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(100, ge=1, le=1000),
+    part_no: Optional[str] = None,
+    name: Optional[str] = None,
+    category_id: Optional[int] = None,
+    min_stock: Optional[float] = None,
+    max_stock: Optional[float] = None,
+    is_active: Optional[bool] = None,
+    db: Session = Depends(get_db)
+):
+    """获取备件列表"""
+    query = db.query(SparePart)
+    
+    # 应用过滤条件
+    if part_no:
+        query = query.filter(SparePart.part_no.ilike(f"%{part_no}%"))
+    if name:
+        query = query.filter(SparePart.name.ilike(f"%{name}%"))
+    if category_id:
+        query = query.filter(SparePart.category_id == category_id)
+    if min_stock is not None:
+        query = query.filter(SparePart.stock_quantity >= min_stock)
+    if max_stock is not None:
+        query = query.filter(SparePart.stock_quantity <= max_stock)
+    if is_active is not None:
+        query = query.filter(SparePart.is_active == is_active)
+    
+    # 获取总数
+    total = query.count()
+    
+    # 分页
+    spare_parts = query.order_by(SparePart.created_time.desc())\
+                      .offset(skip)\
+                      .limit(limit)\
+                      .all()
+    
+    return {
+        "items": spare_parts,
+        "total": total,
+        "skip": skip,
+        "limit": limit
+    }
+
+@router.get("/spare-parts/{id}", response_model=SparePartResponse)
+def get_spare_part(
+    id: int,
+    db: Session = Depends(get_db)
+):
+    """获取单个备件详情"""
+    spare_part = db.query(SparePart).filter(SparePart.id == id).first()
+    if not spare_part:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="备件不存在"
+        )
+    return spare_part
+
+@router.post("/spare-parts", response_model=SparePartResponse)
+def create_spare_part(
+    spare_part_data: SparePartCreate,
+    db: Session = Depends(get_db)
+):
+    """创建备件"""
+    # 检查备件编号是否已存在
+    existing = db.query(SparePart)\
+                 .filter(SparePart.part_no == spare_part_data.part_no)\
+                 .first()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="备件编号已存在"
+        )
+    
+    # 检查分类是否存在
+    if spare_part_data.category_id:
+        category = db.query(Category)\
+                     .filter(Category.id == spare_part_data.category_id)\
+                     .first()
+        if not category:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="分类不存在"
+            )
+    
+    # 创建备件
+    spare_part = SparePart(**spare_part_data.dict())
+    db.add(spare_part)
+    db.commit()
+    db.refresh(spare_part)
+    
+    return spare_part
+
+@router.put("/spare-parts/{id}", response_model=SparePartResponse)
+def update_spare_part(
+    id: int,
+    spare_part_data: SparePartUpdate,
+    db: Session = Depends(get_db)
+):
+    """更新备件"""
+    spare_part = db.query(SparePart).filter(SparePart.id == id).first()
+    if not spare_part:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="备件不存在"
+        )
+    
+    # 如果更新了备件编号，检查是否重复
+    if spare_part_data.part_no and spare_part_data.part_no != spare_part.part_no:
+        existing = db.query(SparePart)\
+                     .filter(
+                         SparePart.part_no == spare_part_data.part_no,
+                         SparePart.id != id
+                     )\
+                     .first()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="备件编号已存在"
+            )
+    
+    # 更新字段
+    update_data = spare_part_data.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(spare_part, field, value)
+    
+    db.commit()
+    db.refresh(spare_part)
+    
+    return spare_part
+
+@router.delete("/spare-parts/{id}")
+def delete_spare_part(
+    id: int,
+    db: Session = Depends(get_db)
+):
+    """删除备件（软删除）"""
+    spare_part = db.query(SparePart).filter(SparePart.id == id).first()
+    if not spare_part:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="备件不存在"
+        )
+    
+    # 检查是否有库存
+    if spare_part.stock_quantity > 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="备件仍有库存，无法删除"
+        )
+    
+    # 软删除
+    spare_part.is_active = False
+    db.commit()
+    
+    return {"message": "删除成功"}
+
+@router.get("/spare-parts/{id}/stock-history")
+def get_stock_history(
+    id: int,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    db: Session = Depends(get_db)
+):
+    """获取备件库存历史"""
+    spare_part = db.query(SparePart).filter(SparePart.id == id).first()
+    if not spare_part:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="备件不存在"
+        )
+    
+    # 获取入库记录
+    inbound_query = db.query(InboundRecord)\
+                      .filter(InboundRecord.spare_part_id == id)
+    
+    # 获取出库记录
+    outbound_query = db.query(OutboundRecord)\
+                       .filter(OutboundRecord.spare_part_id == id)
+    
+    if start_date:
+        inbound_query = inbound_query.filter(InboundRecord.inbound_time >= start_date)
+        outbound_query = outbound_query.filter(OutboundRecord.outbound_time >= start_date)
+    
+    if end_date:
+        inbound_query = inbound_query.filter(InboundRecord.inbound_time <= end_date)
+        outbound_query = outbound_query.filter(OutboundRecord.outbound_time <= end_date)
+    
+    inbound_records = inbound_query.order_by(InboundRecord.inbound_time.desc()).all()
+    outbound_records = outbound_query.order_by(OutboundRecord.outbound_time.desc()).all()
+    
+    return {
+        "spare_part": spare_part,
+        "inbound_records": inbound_records,
+        "outbound_records": outbound_records
+    }

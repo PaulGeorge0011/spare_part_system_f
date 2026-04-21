@@ -1,0 +1,81 @@
+# ============================================================
+# 白码 Nginx 反向代理配置（子域名方案）
+# ============================================================
+#
+# 用途：在白码所在的 Nginx（占用 80/443 端口）中添加本配置，
+#       为备件管理系统分配一个子域名（如 spare.haodaapp.yxjyc.com），
+#       通过反向代理将请求转发到备件系统的 8080 端口。
+#
+# 优点：
+#   - iframe 地址使用域名（https://spare.haodaapp.yxjyc.com/），不暴露服务器 IP
+#   - 复用白码的 HTTPS 证书（若为通配符证书）或单独申请
+#   - 同域/子域场景下浏览器安全策略更友好
+#   - 无 Mixed Content 问题
+#
+# 使用方法：
+#   1. 将此文件复制到白码 Nginx 的配置目录（通常是 /etc/nginx/conf.d/）
+#   2. 根据实际情况修改下方 server_name、ssl_certificate 等
+#   3. 配置 DNS 解析（见下方说明）
+#   4. 重启白码 Nginx: nginx -t && nginx -s reload
+#
+# DNS 配置：
+#   在域名解析中添加一条 A 记录：
+#     spare.haodaapp.yxjyc.com  →  <服务器内网/公网IP>
+#   或若使用通配符：
+#     *.haodaapp.yxjyc.com      →  <服务器IP>
+#
+# ============================================================
+
+# HTTP → HTTPS 重定向
+server {
+    listen 80;
+    server_name spare.haodaapp.yxjyc.com;  # ← 改为你的子域名
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS 反向代理
+server {
+    listen 443 ssl http2;
+    server_name spare.haodaapp.yxjyc.com;  # ← 改为你的子域名
+
+    # ---- SSL 证书配置 ----
+    # 方式一：若白码已有通配符证书（*.haodaapp.yxjyc.com），直接复用
+    # ssl_certificate     /path/to/wildcard.haodaapp.yxjyc.com.crt;
+    # ssl_certificate_key /path/to/wildcard.haodaapp.yxjyc.com.key;
+
+    # 方式二：为子域名单独申请 Let's Encrypt 证书
+    # certbot certonly --nginx -d spare.haodaapp.yxjyc.com
+    ssl_certificate     /etc/letsencrypt/live/spare.haodaapp.yxjyc.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/spare.haodaapp.yxjyc.com/privkey.pem;
+
+    # SSL 安全设置
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    # 文件上传大小限制（与备件系统一致）
+    client_max_body_size 10M;
+
+    # ---- 反向代理到备件管理系统 ----
+    # 备件系统 Nginx 在本机的 8080 端口
+    location / {
+        proxy_pass http://127.0.0.1:8080;
+
+        # 传递真实客户端信息
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+
+        # WebSocket 支持（Vite HMR / 实时功能）
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 86400;
+
+        # 缓冲设置
+        proxy_buffering off;
+        proxy_request_buffering off;
+    }
+}

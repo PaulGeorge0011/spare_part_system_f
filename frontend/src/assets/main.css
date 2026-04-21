@@ -1,0 +1,75 @@
+@import './base.css';
+
+/* 移动端与适配 */
+:root {
+  --mobile-header-height: 56px;
+  --mobile-breakpoint: 768px;
+  --safe-area-inset-top: env(safe-area-inset-top, 0);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0);
+  --safe-area-inset-left: env(safe-area-inset-left, 0);
+  --safe-area-inset-right: env(safe-area-inset-right, 0);
+  --touch-target-min: 44px;
+}
+
+#app {
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 0;
+  font-weight: normal;
+  min-height: 100vh;
+}
+
+a,
+.green {
+  text-decoration: none;
+  color: hsla(160, 100%, 37%, 1);
+  transition: 0.4s;
+  padding: 3px;
+}
+
+@media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
+}
+
+/* 移动端全局：主内容区内边距、安全区域、触摸优化 */
+@media (max-width: 767px) {
+  .el-main {
+    padding: 12px !important;
+    padding-left: calc(12px + var(--safe-area-inset-left)) !important;
+    padding-right: calc(12px + var(--safe-area-inset-right)) !important;
+    padding-bottom: calc(12px + var(--safe-area-inset-bottom)) !important;
+  }
+
+  /* 弹窗移动端占满宽、可滚动 */
+  .el-dialog {
+    max-width: calc(100vw - 24px) !important;
+    margin: 8px auto !important;
+  }
+  .el-dialog__body {
+    max-height: calc(100dvh - 120px);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 表格横向滚动与触摸 */
+  .el-table {
+    font-size: 13px;
+  }
+  .el-table__body-wrapper {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 主操作按钮与输入框最小触摸区域（small 按钮不强制） */
+  .el-button:not(.el-button--small) {
+    min-height: var(--touch-target-min);
+    padding: 8px 14px;
+  }
+  .el-input__wrapper {
+    min-height: var(--touch-target-min);
+  }
+  .el-select .el-select__wrapper {
+    min-height: var(--touch-target-min);
+  }
+}

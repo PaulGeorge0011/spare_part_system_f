@@ -1,0 +1,266 @@
+services:
+  # ========== MinIO 对象存储服务 ==========
+  minio:
+    image: minio/minio:latest
+    container_name: spare-part-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-06002336fwbMINIO}
+      MINIO_DEFAULT_BUCKETS: "spareparts"
+      MINIO_DOMAIN: localhost,minio  # 允许多个域名
+      MINIO_PUBLIC_BUCKETS: "spareparts"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"  # API端口
+      - "9001:9001"  # 管理控制台端口
+    networks:
+      - spare-part-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+  # ... 已有服务（mysql, redis, fastapi, frontend等）
+
+  # ========== MinIO 客户端（用于初始化） ==========
+  minio-create-buckets:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc alias set spareparts-minio http://minio:9000 $${MINIO_ROOT_USER} $${MINIO_ROOT_PASSWORD};
+      /usr/bin/mc mb spareparts-minio/spareparts --ignore-existing;
+      /usr/bin/mc policy set public spareparts-minio/spareparts;
+      echo '✅ MinIO buckets created and configured';
+      "
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-06002336fwbMINIO}
+      MINIO_DOMAIN: localhost,minio  # 允许多个域名
+    networks:
+      - spare-part-network
+
+
+  django-admin:
+    image: spare_part_system-django-admin:latest
+    build: ./backend/admin
+    container_name: spare-part-django-admin
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      MYSQL_HOST: mysql
+      MYSQL_DATABASE: spare_part_db
+      MYSQL_USER: ${MYSQL_USER:-sparepart}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sparepart123}
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-django-dev-secret-key-change-in-production}
+      DJANGO_DEBUG: "True"
+      DJANGO_SUPERUSER_USERNAME: admin
+      DJANGO_SUPERUSER_EMAIL: admin@example.com
+      DJANGO_SUPERUSER_PASSWORD: admin123
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./backend/admin:/app
+      - django_static:/app/staticfiles
+      - django_media:/app/media
+    networks:
+      - spare-part-network
+    # 移除复杂的 command，使用 Dockerfile 中的 CMD
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/admin/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    command: >
+      sh -c "sleep 10 &&
+           python manage.py migrate &&
+           python manage.py collectstatic --noinput &&
+           python manage.py createsuperuser --noinput || true &&
+           python manage.py runserver 0.0.0.0:8001"
+        
+  mysql:
+    image: mysql:8.0
+    container_name: spare-part-mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-06002336fwbSQL}
+      MYSQL_DATABASE: spare_part_db
+      MYSQL_USER: ${MYSQL_USER:-sparepart}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-sparepart123}
+    volumes:
+      - mysql_data:/var/lib/mysql
+      #- ./mysql/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "23306:3306"
+    networks:
+      - spare-part-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: spare-part-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - spare-part-network
+
+  fastapi:
+    image: spare_part_system-fastapi:latest
+    build: ./backend/api
+    container_name: spare-part-fastapi
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-sparepart}:${MYSQL_PASSWORD:-sparepart123}@mysql:3306/spare_part_db
+      REDIS_URL: redis://redis:6379/0
+      WECHAT_CORP_ID: ${WECHAT_CORP_ID}
+      WECHAT_CORP_SECRET: ${WECHAT_CORP_SECRET}
+      SECRET_KEY: ${SECRET_KEY:-dev-secret-key-change-in-production}
+      # 性能优化：生产环境设为 False 关闭 SQL 日志
+      DEBUG: ${DEBUG:-False}
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_BUCKET_NAME: spareparts
+      MINIO_SECURE: "false"
+      MINIO_REGION: us-east-1
+      # 二级目录部署时前端通过 /zs2sbgl/minio/ 访问，后端返回的图片 URL 需带此前缀
+      MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-/minio}
+      # 图片上传配置
+      ALLOWED_IMAGE_TYPES: "image/jpeg,image/png,image/gif,image/webp,image/bmp"
+      MAX_UPLOAD_SIZE_MB: "10"
+      # SSO 单点登录（Keycloak OIDC）
+      SSO_ENABLED: ${SSO_ENABLED:-false}
+      SSO_CLIENT_ID: ${SSO_CLIENT_ID:-}
+      SSO_CLIENT_SECRET: ${SSO_CLIENT_SECRET:-}
+      SSO_BASE_URL: ${SSO_BASE_URL:-}
+      SSO_REALM: ${SSO_REALM:-yxcf}
+      SSO_REDIRECT_URI: ${SSO_REDIRECT_URI:-}
+    ports:
+      - "8888:8000"   # 主机 8888 映射到容器 8000（避免 Windows 保留端口范围导致 bind 权限错误）
+    volumes:
+      - ./backend/api:/app # 代码目录
+      - ./uploads:/app/uploads  # 上传目录，确保容器内有这个目录      
+    networks:
+      - spare-part-network
+
+
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+#迁移时使用：
+#    command: >
+#      sh -c "sleep 5 &&
+#             alembic upgrade head &&
+#             uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+#  celery-worker:
+#    build: ./backend/celery_worker
+#    container_name: spare-part-celery-worker
+#    depends_on:
+#      - redis
+#      - fastapi
+#    environment:
+#      DATABASE_URL: mysql+pymysql://${MYSQL_USER:-sparepart}:${MYSQL_PASSWORD:-sparepart123}@mysql:3306/spare_part_db
+#      REDIS_URL: redis://redis:6379/0
+#    volumes:
+#      - ./backend/api:/app
+#    networks:
+#      - spare-part-network
+#    command: celery -A app.celery_app worker --loglevel=info
+
+ # 生产前端（基于Nginx）
+#  frontend:
+#    build: ./frontend
+#    container_name: spare-part-frontend  
+#    depends_on:
+#      - fastapi
+#    ports:
+#      - "3000:80"
+#    networks:
+#      - spare-part-network
+#    restart: unless-stopped
+#    environment:
+#      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8888/api/v1}
+    # 生产环境不挂载源代码
+
+  # 开发前端（基于Vite开发服务器）
+  frontend-dev:
+    image: spare_part_system-frontend-dev:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.dev
+    container_name: spare-part-frontend-dev
+    depends_on:
+      - fastapi
+      - minio
+    ports:
+      - "5173:5173"
+      - "13000:3000"
+    networks:
+      - spare-part-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Docker 内 Vite 代理需指向后端服务名，否则 /api 会连到本容器
+      VITE_PROXY_TARGET: "http://fastapi:8000"
+      # MinIO 代理目标（Docker 内使用服务名）
+      VITE_MINIO_PROXY_TARGET: "http://minio:9000"
+      # 工厂新媒体代理部署时在 .env 中设 VITE_BASE_PATH=/zs2sbgl/，白码为 /spare/，留空则根路径
+      VITE_BASE_PATH: "${VITE_BASE_PATH:-}"
+    env_file:
+      - ./frontend/.env.development      
+#    environment (legacy):
+#      NODE_ENV: development
+#      DOCKER: "true"  # 告诉Vite在Docker环境中运行
+#      VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+      - /app/.vite
+    stdin_open: true
+    tty: true
+
+  nginx:
+    image: nginx:alpine
+    container_name: spare-part-nginx
+    # 白码已占用 80/443，本项目对外使用 8080/8443
+    ports:
+      - "8080:80"
+      - "8443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./ssl:/etc/nginx/ssl
+      # 工厂外网：打包好的前端 dist 挂在此路径，nginx 优先走静态；空目录时回退到 frontend-dev
+      - ./frontend/dist:/usr/share/nginx/html/zs2sbgl
+    depends_on:
+      - frontend-dev
+      - fastapi
+      - minio
+    networks:
+      - spare-part-network
+
+networks:
+  spare-part-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  redis_data:
+  django_static:
+  django_media:
+  minio_data:
+  #frontend_data:
